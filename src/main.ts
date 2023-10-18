@@ -33,10 +33,12 @@ interface Point {
   y: number;
 }
 
-const lines: Point[][] = [];
-const redoLines: Point[] = [];
+type Line = Point[] | undefined;
 
-let currentLine: Point[] = [];
+const lines: Line[] = [];
+const redoLines: Line[] = [];
+
+let currentLine: Line = [];
 
 const firstIndex = 0; //magic number
 const origin: Point = { x: 0, y: 0 };
@@ -60,7 +62,7 @@ canvas.addEventListener("mousemove", (e) => {
     cursor.x = e.offsetX;
     cursor.y = e.offsetY;
     const movePoint: Point = { x: cursor.x, y: cursor.y };
-    currentLine.push(movePoint);
+    currentLine!.push(movePoint);
 
     canvas.dispatchEvent(new CustomEvent("drawing-changed"));
   }
@@ -81,11 +83,11 @@ canvas.addEventListener("drawing-changed", () => {
 function redraw() {
   ctx!.clearRect(origin.x, origin.y, canvas.width, canvas.height);
   for (const line of lines) {
-    if (line.length) {
+    if (line!.length) {
       ctx!.beginPath();
-      const { x, y } = line[firstIndex];
+      const { x, y } = line![firstIndex];
       ctx!.moveTo(x, y);
-      for (const { x, y } of line) {
+      for (const { x, y } of line!) {
         ctx!.lineTo(x, y);
       }
       ctx!.stroke();
@@ -94,11 +96,31 @@ function redraw() {
   //console.log(lines);
 }
 
+//short cut
+function newLine() {
+  document.body.append(document.createElement("br"));
+}
+newLine();
+
 const clearButton = document.createElement("button");
 clearButton.innerHTML = "clear";
 document.body.append(clearButton);
 
 clearButton.addEventListener("click", () => {
   lines.splice(firstIndex, lines.length);
+  canvas.dispatchEvent(new CustomEvent("drawing-changed"));
+});
+
+newLine();
+//step4
+const undoButton = document.createElement("button");
+undoButton.innerHTML = "undo";
+document.body.append(undoButton);
+
+undoButton.addEventListener("click", () => {
+  if (lines.length) {
+    const lastLine: Line = lines!.pop();
+    redoLines.push(lastLine);
+  }
   canvas.dispatchEvent(new CustomEvent("drawing-changed"));
 });

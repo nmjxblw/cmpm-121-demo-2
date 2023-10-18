@@ -25,43 +25,80 @@ app.append(document.createElement("br"));
 document.body.append(canvas);
 const ctx = canvas.getContext("2d");
 ctx!.fillStyle = "white";
+
 const cursor = { active: false, x: 0, y: 0 };
 
-//const paths: any[] = [];
+interface Point {
+  x: number;
+  y: number;
+}
 
-//let currentIndex = paths.length - 1;
+const lines: Point[][] = [];
+const redoLines: Point[] = [];
+
+let currentLine: Point[] = [];
+
+const firstIndex = 0; //magic number
+const origin: Point = { x: 0, y: 0 };
 
 canvas.addEventListener("mousedown", (e) => {
   cursor.active = true;
   cursor.x = e.offsetX;
   cursor.y = e.offsetY;
-  //currentIndex++;
+
+  currentLine = [];
+  lines.push(currentLine);
+  redoLines.splice(firstIndex, redoLines.length);
+  const lineStartPoint: Point = { x: cursor.x, y: cursor.y };
+  currentLine.push(lineStartPoint);
+
+  canvas.dispatchEvent(new CustomEvent("drawing-changed"));
 });
 
-//let path: any[] = [];
 canvas.addEventListener("mousemove", (e) => {
   if (cursor.active) {
-    ctx!.beginPath();
-    ctx!.moveTo(cursor.x, cursor.y);
-    ctx!.lineTo(e.offsetX, e.offsetY);
-    ctx!.stroke();
     cursor.x = e.offsetX;
     cursor.y = e.offsetY;
-    //path.push({ x: cursor.x, y: cursor.y });
+    const movePoint: Point = { x: cursor.x, y: cursor.y };
+    currentLine.push(movePoint);
+
+    canvas.dispatchEvent(new CustomEvent("drawing-changed"));
   }
 });
 
 canvas.addEventListener("mouseup", () => {
-  //paths.push(path);
-  //path = [];
   cursor.active = false;
-  //console.log(paths);
+  currentLine = [];
+
+  canvas.dispatchEvent(new CustomEvent("drawing-changed"));
 });
+
+//step3
+canvas.addEventListener("drawing-changed", () => {
+  redraw();
+});
+
+function redraw() {
+  ctx!.clearRect(origin.x, origin.y, canvas.width, canvas.height);
+  for (const line of lines) {
+    if (line.length) {
+      ctx!.beginPath();
+      const { x, y } = line[firstIndex];
+      ctx!.moveTo(x, y);
+      for (const { x, y } of line) {
+        ctx!.lineTo(x, y);
+      }
+      ctx!.stroke();
+    }
+  }
+  //console.log(lines);
+}
 
 const clearButton = document.createElement("button");
 clearButton.innerHTML = "clear";
 document.body.append(clearButton);
 
 clearButton.addEventListener("click", () => {
-  ctx!.clearRect(0, 0, canvas.width, canvas.height);
+  lines.splice(firstIndex, lines.length);
+  canvas.dispatchEvent(new CustomEvent("drawing-changed"));
 });

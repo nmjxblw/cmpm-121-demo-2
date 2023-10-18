@@ -124,3 +124,16 @@ undoButton.addEventListener("click", () => {
   }
   canvas.dispatchEvent(new CustomEvent("drawing-changed"));
 });
+
+newLine();
+const redoButton = document.createElement("button");
+redoButton.innerHTML = "redo";
+document.body.append(redoButton);
+
+redoButton.addEventListener("click", () => {
+  if (redoLines.length) {
+    const lastRedoLine: Line = redoLines.pop();
+    lines.push(lastRedoLine);
+  }
+  canvas.dispatchEvent(new CustomEvent("drawing-changed"));
+});

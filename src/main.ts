@@ -119,7 +119,7 @@ document.body.append(undoButton);
 
 undoButton.addEventListener("click", () => {
   if (lines.length) {
-    const lastLine: Line = lines!.pop();
+    const lastLine: Line = lines.pop();
     redoLines.push(lastLine);
   }
   canvas.dispatchEvent(new CustomEvent("drawing-changed"));

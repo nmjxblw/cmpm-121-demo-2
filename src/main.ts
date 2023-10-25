@@ -28,8 +28,13 @@ ctx!.fillStyle = "white";
 
 //magic numbers
 const FIRST_INDEX = 0;
-const LINE_WIDTH = 4;
+const markerSize = 32;
+let lineWidth = 4;
 const ORIGIN: Point = { x: 0, y: 0 };
+let scaleLevel = 5;
+const MAX_LEVEL = 8;
+const MIN_LEVEL = 1;
+const RATIO = 1.5;
 
 interface Point {
   x: number;
@@ -62,12 +67,16 @@ bus.addEventListener("cursor-changed", redraw);
 
 class LineCommand {
   public points: Point[];
-  constructor(x: number, y: number) {
+  public width: number;
+  public style: string;
+  constructor(x: number, y: number, width?: number, style?: string) {
     this.points = [{ x, y }];
+    this.width = width ? width : lineWidth;
+    this.style = style ? style : "black";
   }
   execute() {
-    ctx!.strokeStyle = "black";
-    ctx!.lineWidth = LINE_WIDTH;
+    ctx!.strokeStyle = this.style;
+    ctx!.lineWidth = this.width;
     ctx!.beginPath();
     const { x, y } = this.points[FIRST_INDEX];
     ctx!.moveTo(x, y);
@@ -90,7 +99,7 @@ class CursorCommand {
     this.y = y;
   }
   execute() {
-    ctx!.font = "32px monospace";
+    ctx!.font = `${markerSize}px monospace`;
     ctx!.fillText("*", this.x + this.offset.x, this.y + this.offset.y);
   }
 }
@@ -112,14 +121,19 @@ canvas.addEventListener("mousemove", (e) => {
   notify("cursor-changed");
 
   const LEFT_BUTTON_NUMBER = 1;
-  if (e.buttons == LEFT_BUTTON_NUMBER) {
-    currentLineCommand!.points.push({ x: e.offsetX, y: e.offsetY });
+  if (e.buttons == LEFT_BUTTON_NUMBER && currentLineCommand) {
+    currentLineCommand.points.push({ x: e.offsetX, y: e.offsetY });
     notify("drawing-changed");
   }
 });
 
 canvas.addEventListener("mousedown", (e) => {
-  currentLineCommand = new LineCommand(e.offsetX, e.offsetY);
+  currentLineCommand = new LineCommand(
+    e.offsetX,
+    e.offsetY,
+    lineWidth,
+    "black"
+  );
   commands.push(currentLineCommand);
   redoCommands.splice(FIRST_INDEX, redoCommands.length);
   notify("drawing-changed");
@@ -164,3 +178,87 @@ redoButton.addEventListener("click", () => {
     notify("drawing-changed");
   }
 });
+
+class Button {
+  public name: string;
+  public onClick?: () => void;
+
+  constructor(name: string, onClick: () => void) {
+    this.name = name;
+    this.onClick = onClick;
+    this.setOnClickFunction();
+  }
+
+  private setOnClickFunction(): void {
+    const button = document.createElement("Button");
+    button.innerHTML = this.name;
+
+    if (this.onClick) {
+      button.addEventListener("click", () => {
+        this.onClick!();
+      });
+    } else {
+      button.addEventListener("click", () => {
+        console.log(`There's no onClick for ${button.innerHTML}`);
+      });
+    }
+    document.body.appendChild(button);
+  }
+
+  setOnClick(onClick: () => void): void {
+    this.onClick = onClick;
+    const button: HTMLButtonElement | null = document.querySelector("button");
+    if (button) {
+      button.addEventListener("click", () => {
+        this.onClick!();
+      });
+    }
+  }
+  setName(name: string): void {
+    this.name = name;
+    const button: HTMLButtonElement | null = document.querySelector("button");
+    if (button) {
+      button.innerHTML = this.name;
+    }
+  }
+  get innerHTML(): string {
+    const button: HTMLButtonElement | null = document.querySelector("button");
+    if (button) {
+      return button.innerHTML;
+    }
+    return "";
+  }
+  set innerHTML(name: string) {
+    this.name = name;
+    const button: HTMLButtonElement | null = document.querySelector("button");
+    if (button) {
+      button.innerHTML = name;
+    }
+  }
+}
+document.body.append(document.createElement("br"));
+new Button("-", () => {
+  if (scaleLevel > MIN_LEVEL) {
+    lineWidth /= RATIO;
+    scaleLevel--;
+    notify("scale-changed");
+  }
+});
+
+const currentLineWidthElement = document.createElement("p");
+currentLineWidthElement.innerHTML = `Width:${scaleLevel}`;
+document.body.appendChild(currentLineWidthElement);
+
+new Button("+", () => {
+  if (scaleLevel < MAX_LEVEL) {
+    lineWidth *= RATIO;
+    scaleLevel++;
+    notify("scale-changed");
+  }
+});
+
+bus.addEventListener("scale-changed", () => {
+  currentLineWidthElement.innerHTML = `Width:${scaleLevel}`;
+});
+
+document.body.append(document.createElement("br"));

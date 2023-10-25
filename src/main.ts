@@ -28,13 +28,16 @@ ctx!.fillStyle = "white";
 
 //magic numbers
 const FIRST_INDEX = 0;
-const markerSize = 32;
-let lineWidth = 4;
+const LINE_WIDTH = 4;
+let lineWidth = LINE_WIDTH;
+const lineStyle = "black";
 const ORIGIN: Point = { x: 0, y: 0 };
 let scaleLevel = 5;
 const MAX_LEVEL = 8;
 const MIN_LEVEL = 1;
 const RATIO = 1.5;
+const START_ANGLE = 0;
+const DEFAULT_RADIUS = 1;
 
 interface Point {
   x: number;
@@ -72,7 +75,7 @@ class LineCommand {
   constructor(x: number, y: number, width?: number, style?: string) {
     this.points = [{ x, y }];
     this.width = width ? width : lineWidth;
-    this.style = style ? style : "black";
+    this.style = style ? style : lineStyle;
   }
   execute() {
     ctx!.strokeStyle = this.style;
@@ -99,7 +102,7 @@ class CursorCommand {
     this.y = y;
   }
   execute() {
-    ctx!.font = `${markerSize}px monospace`;
+    ctx!.font = `32px monospace`;
     ctx!.fillText("*", this.x + this.offset.x, this.y + this.offset.y);
   }
 }
@@ -108,17 +111,26 @@ let currentLineCommand: LineCommand | null = null;
 
 canvas.addEventListener("mouseout", () => {
   cursorCommand = null;
+  canvas.style.cursor = "default";
   notify("cursor-changed");
 });
 
 canvas.addEventListener("mouseenter", (e) => {
   cursorCommand = new CursorCommand(e.offsetX, e.offsetY);
+  canvas.style.cursor = "none";
   notify("cursor-changed");
 });
+
+let toolPreview: ToolPreview | null = null;
 
 canvas.addEventListener("mousemove", (e) => {
   cursorCommand = new CursorCommand(e.offsetX, e.offsetY);
   notify("cursor-changed");
+
+  if (!e.buttons) {
+    toolPreview = new ToolPreview(e.offsetX, e.offsetY, DEFAULT_RADIUS);
+    notify("tool-actived");
+  }
 
   const LEFT_BUTTON_NUMBER = 1;
   if (e.buttons == LEFT_BUTTON_NUMBER && currentLineCommand) {
@@ -132,11 +144,12 @@ canvas.addEventListener("mousedown", (e) => {
     e.offsetX,
     e.offsetY,
     lineWidth,
-    "black"
+    lineStyle
   );
   commands.push(currentLineCommand);
   redoCommands.splice(FIRST_INDEX, redoCommands.length);
   notify("drawing-changed");
+  toolPreview = null;
 });
 
 canvas.addEventListener("mouseup", () => {
@@ -262,3 +275,31 @@ bus.addEventListener("scale-changed", () => {
 });
 
 document.body.append(document.createElement("br"));
+
+class ToolPreview {
+  private _x: number;
+  private _y: number;
+  private _radius: number;
+
+  constructor(x: number, y: number, radius: number) {
+    this._x = x;
+    this._y = y;
+    this._radius = radius * (lineWidth / LINE_WIDTH);
+  }
+
+  draw(ctx: CanvasRenderingContext2D): void {
+    ctx.beginPath();
+    ctx.arc(this._x, this._y, this._radius, START_ANGLE, Math.PI * 2);
+    ctx.strokeStyle = lineStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  }
+}
+
+bus.addEventListener("tool-actived", () => {
+  if (toolPreview) {
+    ctx!.clearRect(ORIGIN.x, ORIGIN.y, canvas.width, canvas.height);
+    commands.forEach((cmd) => cmd.execute());
+    toolPreview.draw(ctx!);
+  }
+});

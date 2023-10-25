@@ -16,6 +16,7 @@ app.append(header);
 //setp2
 const canvas = document.createElement("canvas");
 const canvasScale = 256;
+const HALF_SCALE = 128;
 canvas.width = canvasScale;
 canvas.height = canvasScale;
 canvas.style.border = "thin solid black";
@@ -129,7 +130,7 @@ canvas.addEventListener("mousemove", (e) => {
 
   if (!e.buttons) {
     toolPreview = new ToolPreview(e.offsetX, e.offsetY, DEFAULT_RADIUS);
-    notify("tool-actived");
+    notify("tool-moved");
   }
 
   const LEFT_BUTTON_NUMBER = 1;
@@ -289,17 +290,125 @@ class ToolPreview {
 
   draw(ctx: CanvasRenderingContext2D): void {
     ctx.beginPath();
-    ctx.arc(this._x, this._y, this._radius, START_ANGLE, Math.PI * 2);
+    const c = 2;
+    ctx.arc(this._x, this._y, this._radius, START_ANGLE, Math.PI * c);
     ctx.strokeStyle = lineStyle;
     ctx.lineWidth = lineWidth;
     ctx.stroke();
   }
 }
 
-bus.addEventListener("tool-actived", () => {
+bus.addEventListener("tool-moved", () => {
   if (toolPreview) {
     ctx!.clearRect(ORIGIN.x, ORIGIN.y, canvas.width, canvas.height);
     commands.forEach((cmd) => cmd.execute());
     toolPreview.draw(ctx!);
   }
+});
+
+//copy from chatgpt
+class EmojiSticker {
+  private _x: number;
+  private _y: number;
+  private _emoji: string;
+
+  constructor(x: number, y: number, emoji: string) {
+    this._x = x;
+    this._y = y;
+    this._emoji = emoji;
+  }
+
+  draw(ctx: CanvasRenderingContext2D): void {
+    ctx.font = `${lineWidth}px sans-serif`;
+    ctx.fillText(this._emoji, this._x, this._y);
+  }
+
+  set x(x: number) {
+    this._x = x;
+  }
+  get x(): number {
+    return this._x;
+  }
+  set y(y: number) {
+    this._y = y;
+  }
+  get y(): number {
+    return this._y;
+  }
+  set position(point: Point) {
+    this._x = point.x;
+    this._y = point.y;
+  }
+  get posion(): Point {
+    return { x: this._x, y: this._y };
+  }
+
+  setPosition(x: number, y: number): void;
+  setPosition(point: Point): void;
+  setPosition(arg1: number | Point, arg2?: number): void {
+    if (typeof arg1 === "number" && typeof arg2 === "number") {
+      this._x = arg1;
+      this._y = arg2;
+    } else if (typeof arg1 === "object") {
+      this._x = arg1.x;
+      this._y = arg1.y;
+    } else {
+      throw new Error("Invalid arguments");
+    }
+  }
+}
+
+class StickerCommand {
+  private _sticker: EmojiSticker;
+
+  constructor(sticker: EmojiSticker) {
+    this._sticker = sticker;
+  }
+
+  preview(x: number, y: number): void {
+    this._sticker.setPosition(x, y);
+  }
+
+  draw(ctx: CanvasRenderingContext2D): void {
+    this._sticker.draw(ctx);
+  }
+}
+
+document.body.append(document.createElement("br"));
+const emojiSticker1 = new EmojiSticker(ORIGIN.x, ORIGIN.y, "😃");
+document.body.append(document.createElement("br"));
+const emojiSticker2 = new EmojiSticker(ORIGIN.x, ORIGIN.y, "😔");
+document.body.append(document.createElement("br"));
+const emojiSticker3 = new EmojiSticker(ORIGIN.x, ORIGIN.y, "⭐");
+
+const stickerCommands: StickerCommand[] | null = [];
+
+const stickerButtons: Record<string, Button> = {
+  happy: new Button("😃", () => {
+    const stickerCommand = new StickerCommand(emojiSticker1);
+    stickerCommands.push(stickerCommand);
+    notify("tool-moved");
+  }),
+  sad: new Button("😔", () => {
+    const stickerCommand = new StickerCommand(emojiSticker2);
+    stickerCommands.push(stickerCommand);
+    notify("tool-moved");
+  }),
+  star: new Button("⭐", () => {
+    const stickerCommand = new StickerCommand(emojiSticker3);
+    stickerCommands.push(stickerCommand);
+    notify("tool-moved");
+  }),
+};
+
+Object.values(stickerButtons).forEach((button) => {
+  button.setOnClick(() => {
+    if (stickerCommands.length) {
+      const INDEX_OFFSET = -1;
+      const stickerCommand =
+        stickerCommands[stickerCommands.length + INDEX_OFFSET];
+      stickerCommand.preview(HALF_SCALE, HALF_SCALE);
+      notify("tool-moved");
+    }
+  });
 });

@@ -26,114 +26,141 @@ document.body.append(canvas);
 const ctx = canvas.getContext("2d");
 ctx!.fillStyle = "white";
 
-const cursor = { active: false, x: 0, y: 0 };
+//magic numbers
+const FIRST_INDEX = 0;
+const LINE_WIDTH = 4;
+const ORIGIN: Point = { x: 0, y: 0 };
 
 interface Point {
   x: number;
   y: number;
 }
 
-type Line = Point[] | undefined;
+const commands: LineCommand[] = [];
+const redoCommands: LineCommand[] = [];
 
-const lines: Line[] = [];
-const redoLines: Line[] = [];
+let cursorCommand: CursorCommand | null = null;
 
-let currentLine: Line = [];
+const bus = new EventTarget();
 
-const firstIndex = 0; //magic number
-const origin: Point = { x: 0, y: 0 };
+function notify(name: string) {
+  bus.dispatchEvent(new Event(name));
+}
 
-canvas.addEventListener("mousedown", (e) => {
-  cursor.active = true;
-  cursor.x = e.offsetX;
-  cursor.y = e.offsetY;
+function redraw() {
+  ctx!.clearRect(ORIGIN.x, ORIGIN.y, canvas.width, canvas.height);
 
-  currentLine = [];
-  lines.push(currentLine);
-  redoLines.splice(firstIndex, redoLines.length);
-  const lineStartPoint: Point = { x: cursor.x, y: cursor.y };
-  currentLine.push(lineStartPoint);
+  commands.forEach((cmd) => cmd.execute());
 
-  canvas.dispatchEvent(new CustomEvent("drawing-changed"));
+  if (cursorCommand) {
+    cursorCommand.execute();
+  }
+}
+
+bus.addEventListener("drawing-changed", redraw);
+bus.addEventListener("cursor-changed", redraw);
+
+class LineCommand {
+  public points: Point[];
+  constructor(x: number, y: number) {
+    this.points = [{ x, y }];
+  }
+  execute() {
+    ctx!.strokeStyle = "black";
+    ctx!.lineWidth = LINE_WIDTH;
+    ctx!.beginPath();
+    const { x, y } = this.points[FIRST_INDEX];
+    ctx!.moveTo(x, y);
+    for (const { x, y } of this.points) {
+      ctx!.lineTo(x, y);
+    }
+    ctx!.stroke();
+  }
+  grow(x: number, y: number) {
+    this.points.push({ x, y });
+  }
+}
+
+class CursorCommand {
+  public x: number;
+  public y: number;
+  public offset: Point = { x: -8, y: 16 };
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+  execute() {
+    ctx!.font = "32px monospace";
+    ctx!.fillText("*", this.x + this.offset.x, this.y + this.offset.y);
+  }
+}
+
+let currentLineCommand: LineCommand | null = null;
+
+canvas.addEventListener("mouseout", () => {
+  cursorCommand = null;
+  notify("cursor-changed");
+});
+
+canvas.addEventListener("mouseenter", (e) => {
+  cursorCommand = new CursorCommand(e.offsetX, e.offsetY);
+  notify("cursor-changed");
 });
 
 canvas.addEventListener("mousemove", (e) => {
-  if (cursor.active) {
-    cursor.x = e.offsetX;
-    cursor.y = e.offsetY;
-    const movePoint: Point = { x: cursor.x, y: cursor.y };
-    currentLine!.push(movePoint);
+  cursorCommand = new CursorCommand(e.offsetX, e.offsetY);
+  notify("cursor-changed");
 
-    canvas.dispatchEvent(new CustomEvent("drawing-changed"));
+  const LEFT_BUTTON_NUMBER = 1;
+  if (e.buttons == LEFT_BUTTON_NUMBER) {
+    currentLineCommand!.points.push({ x: e.offsetX, y: e.offsetY });
+    notify("drawing-changed");
   }
+});
+
+canvas.addEventListener("mousedown", (e) => {
+  currentLineCommand = new LineCommand(e.offsetX, e.offsetY);
+  commands.push(currentLineCommand);
+  redoCommands.splice(FIRST_INDEX, redoCommands.length);
+  notify("drawing-changed");
 });
 
 canvas.addEventListener("mouseup", () => {
-  cursor.active = false;
-  currentLine = [];
-
-  canvas.dispatchEvent(new CustomEvent("drawing-changed"));
+  currentLineCommand = null;
+  notify("drawing-changed");
 });
 
-//step3
-canvas.addEventListener("drawing-changed", () => {
-  redraw();
-});
-
-function redraw() {
-  ctx!.clearRect(origin.x, origin.y, canvas.width, canvas.height);
-  for (const line of lines) {
-    if (line!.length) {
-      ctx!.beginPath();
-      const { x, y } = line![firstIndex];
-      ctx!.moveTo(x, y);
-      for (const { x, y } of line!) {
-        ctx!.lineTo(x, y);
-      }
-      ctx!.stroke();
-    }
-  }
-  //console.log(lines);
-}
-
-//short cut
-function newLine() {
-  document.body.append(document.createElement("br"));
-}
-newLine();
+document.body.append(document.createElement("br"));
 
 const clearButton = document.createElement("button");
 clearButton.innerHTML = "clear";
 document.body.append(clearButton);
 
 clearButton.addEventListener("click", () => {
-  lines.splice(firstIndex, lines.length);
-  canvas.dispatchEvent(new CustomEvent("drawing-changed"));
+  commands.splice(FIRST_INDEX, commands.length);
+  notify("drawing-changed");
 });
 
-newLine();
-//step4
 const undoButton = document.createElement("button");
 undoButton.innerHTML = "undo";
 document.body.append(undoButton);
 
 undoButton.addEventListener("click", () => {
-  if (lines.length) {
-    const lastLine: Line = lines.pop();
-    redoLines.push(lastLine);
+  if (commands.length) {
+    const redoCommand: LineCommand | undefined = commands.pop();
+    redoCommands.push(redoCommand!);
+    notify("drawing-changed");
   }
-  canvas.dispatchEvent(new CustomEvent("drawing-changed"));
 });
 
-newLine();
 const redoButton = document.createElement("button");
 redoButton.innerHTML = "redo";
 document.body.append(redoButton);
 
 redoButton.addEventListener("click", () => {
-  if (redoLines.length) {
-    const lastRedoLine: Line = redoLines.pop();
-    lines.push(lastRedoLine);
+  if (redoCommands.length) {
+    const redoCommand: LineCommand | undefined = redoCommands.pop();
+    commands.push(redoCommand!);
+    notify("drawing-changed");
   }
-  canvas.dispatchEvent(new CustomEvent("drawing-changed"));
 });

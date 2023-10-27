@@ -60,10 +60,8 @@ let currentCommand: LineCommand | StickerCommand | null = null;
 let toolPreview: ToolPreview | null = null;
 let currentTool: ToolType = ToolType.pen;
 let currentSticker: string;
-let userImportEmoji: string[] = [];
+let emojiArray: string[] = ["😃", "♥", "⭐"];
 const buttonArray: Button[] = [];
-const defaultButtonArray: Button[] = [];
-const defaultEmoji: string[] = ["😃", "♥", "⭐"];
 const commands: (LineCommand | StickerCommand)[] = [];
 const redoCommands: (LineCommand | StickerCommand)[] = [];
 const bus = new EventTarget();
@@ -379,38 +377,34 @@ new Button("pen", () => {
   currentTool = ToolType.pen;
 });
 
-function createDefaultEmojiButton() {
-  defaultEmoji.forEach((emoji) => {
-    defaultButtonArray.push(
-      new Button(emoji, () => {
-        currentTool = ToolType.sticker;
-        currentSticker = emoji;
-      })
-    );
-  });
-}
-
-createDefaultEmojiButton();
-
 app.append(document.createElement("br"));
 new Button("Import your emoji!", () => {
-  const minLength = 0;
-  const defaultString: string = userImportEmoji.length == minLength ? "🍬" : "";
+  const defaultLength = 3;
+  const defaultString: string = emojiArray.length <= defaultLength ? "🍬" : "";
   const userInput = window.prompt("Put your emoji/words here!", defaultString);
-  userImportEmoji = [...userImportEmoji, ...userInput!.split(regex)];
+  emojiArray = [...emojiArray, ...userInput!.split(regex)];
   updateCustomButton();
 });
+
 app.append(document.createElement("br"));
 function updateCustomButton() {
   buttonArray.forEach((button) => {
     button.remove();
   });
-  userImportEmoji.forEach((userString) => {
+  let counter = 0;
+  emojiArray.forEach((emoji) => {
     buttonArray.push(
-      new Button(userString, () => {
+      new Button(emoji, () => {
         currentTool = ToolType.sticker;
-        currentSticker = userString;
+        currentSticker = emoji;
       })
     );
+    counter++;
+    const MAX_BUTTON_PER_LINE = 6;
+    const R = 0;
+    if (counter % MAX_BUTTON_PER_LINE == R) {
+      app.append(document.createElement("br"));
+    }
   });
 }
+updateCustomButton();

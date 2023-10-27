@@ -50,6 +50,7 @@ const EMOJI_DEFAULT = 32;
 const LEFT_BUTTON_NUMBER = 1;
 const TWO = 2;
 const TWO_PI = TWO * Math.PI;
+const regex = /[.,#!$%&;:{}=\-_`~()\s\t]+/;
 
 //global variables
 let lineWidth = LINE_WIDTH;
@@ -59,6 +60,10 @@ let currentCommand: LineCommand | StickerCommand | null = null;
 let toolPreview: ToolPreview | null = null;
 let currentTool: ToolType = ToolType.pen;
 let currentSticker: string;
+let userImportEmoji: string[] = [];
+const buttonArray: Button[] = [];
+const defaultButtonArray: Button[] = [];
+const defaultEmoji: string[] = ["😃", "♥", "⭐"];
 const commands: (LineCommand | StickerCommand)[] = [];
 const redoCommands: (LineCommand | StickerCommand)[] = [];
 const bus = new EventTarget();
@@ -206,57 +211,56 @@ class CursorCommand {
 class Button {
   public name: string;
   public onClick?: () => void;
+  private button: HTMLButtonElement;
 
   constructor(name: string, onClick: () => void) {
     this.name = name;
+    this.button = document.createElement("button");
     this.onClick = onClick;
     this.setOnClickFunction();
   }
 
   private setOnClickFunction(): void {
-    const button = document.createElement("Button");
-    button.innerHTML = this.name;
+    this.button.innerHTML = this.name;
 
     if (this.onClick) {
-      button.addEventListener("click", () => {
+      this.button.addEventListener("click", () => {
         this.onClick!();
       });
     } else {
-      button.addEventListener("click", () => {
-        console.log(`There's no onClick for ${button.innerHTML}`);
+      this.button.addEventListener("click", () => {
+        console.log(`There's no onClick for ${this.button.innerHTML}`);
       });
     }
-    app.append(button);
+    app.append(this.button);
   }
-
+  remove(): void {
+    if (this.button) {
+      this.button.remove();
+      console.log(`${this.button.innerHTML} has been moved.`);
+    }
+  }
   setOnClick(onClick: () => void): void {
     this.onClick = onClick;
-    const button: HTMLButtonElement | null = document.querySelector("button");
-    if (button) {
-      button.addEventListener("click", () => {
+    if (this.button) {
+      this.button.addEventListener("click", () => {
         this.onClick!();
       });
     }
   }
   setName(name: string): void {
     this.name = name;
-    const button: HTMLButtonElement | null = document.querySelector("button");
-    if (button) {
-      button.innerHTML = this.name;
+    if (this.button) {
+      this.button.innerHTML = name;
     }
   }
   get innerHTML(): string {
-    const button: HTMLButtonElement | null = document.querySelector("button");
-    if (button) {
-      return button.innerHTML;
-    }
-    return "";
+    return this.button.innerHTML;
   }
   set innerHTML(name: string) {
     this.name = name;
-    const button: HTMLButtonElement | null = document.querySelector("button");
-    if (button) {
-      button.innerHTML = name;
+    if (this.button) {
+      this.button.innerHTML = name;
     }
   }
 }
@@ -375,17 +379,38 @@ new Button("pen", () => {
   currentTool = ToolType.pen;
 });
 
-new Button("😃", () => {
-  currentTool = ToolType.sticker;
-  currentSticker = "😃";
-});
+function createDefaultEmojiButton() {
+  defaultEmoji.forEach((emoji) => {
+    defaultButtonArray.push(
+      new Button(emoji, () => {
+        currentTool = ToolType.sticker;
+        currentSticker = emoji;
+      })
+    );
+  });
+}
 
-new Button("♥", () => {
-  currentTool = ToolType.sticker;
-  currentSticker = "♥";
-});
+createDefaultEmojiButton();
 
-new Button("⭐", () => {
-  currentTool = ToolType.sticker;
-  currentSticker = "⭐";
+app.append(document.createElement("br"));
+new Button("Import your emoji!", () => {
+  const minLength = 0;
+  const defaultString: string = userImportEmoji.length == minLength ? "🍬" : "";
+  const userInput = window.prompt("Put your emoji/words here!", defaultString);
+  userImportEmoji = [...userImportEmoji, ...userInput!.split(regex)];
+  updateCustomButton();
 });
+app.append(document.createElement("br"));
+function updateCustomButton() {
+  buttonArray.forEach((button) => {
+    button.remove();
+  });
+  userImportEmoji.forEach((userString) => {
+    buttonArray.push(
+      new Button(userString, () => {
+        currentTool = ToolType.sticker;
+        currentSticker = userString;
+      })
+    );
+  });
+}

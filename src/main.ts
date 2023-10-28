@@ -355,6 +355,7 @@ new Button("redo", () => {
 });
 app.append(document.createElement("br"));
 
+// for step 11
 // thin button
 new Button("-", () => {
   if (scaleLevel > MIN_LEVEL) {

@@ -321,6 +321,8 @@ canvas.addEventListener("mouseup", () => {
 
 app.append(document.createElement("br"));
 
+//step 12
+//change color
 app.append(colorInput);
 colorInput.addEventListener("input", () => {
   currentColor = colorInput.value;

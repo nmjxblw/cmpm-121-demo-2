@@ -27,6 +27,7 @@ enum ToolType {
 const canvas = document.createElement("canvas");
 const canvasScale = 256;
 const HALF_SCALE = 128;
+const TEMP_CANVAS_SCALE_MULTIPLIER = 4;
 canvas.width = canvasScale;
 canvas.height = canvasScale;
 canvas.style.border = "thin solid black";
@@ -48,8 +49,8 @@ const START_ANGLE = 0;
 const DEFAULT_RADIUS = 1;
 const EMOJI_DEFAULT = 32;
 const LEFT_BUTTON_NUMBER = 1;
-const TWO = 2;
-const TWO_PI = TWO * Math.PI;
+const PI_CONST = 2;
+const TWO_PI = PI_CONST * Math.PI;
 const regex = /[.,#!$%&;:{}=\-_`~()\s\t]+/;
 
 //global variables
@@ -145,16 +146,17 @@ class LineCommand {
     this.width = width ?? lineWidth;
     this.style = currentColor;
   }
-  execute() {
-    ctx!.strokeStyle = this.style;
-    ctx!.lineWidth = this.width;
-    ctx!.beginPath();
+  execute(context?: CanvasRenderingContext2D) {
+    context = context ?? ctx!;
+    context.strokeStyle = this.style;
+    context.lineWidth = this.width;
+    context.beginPath();
     const { x, y } = this.points[FIRST_INDEX];
-    ctx!.moveTo(x, y);
+    context.moveTo(x, y);
     for (const { x, y } of this.points) {
-      ctx!.lineTo(x, y);
+      context.lineTo(x, y);
     }
-    ctx!.stroke();
+    context.stroke();
   }
   grow(x: number, y: number) {
     this.points.push({ x, y });
@@ -183,12 +185,13 @@ class StickerCommand {
     this._size = size;
   }
 
-  draw(ctx: CanvasRenderingContext2D): void {
-    ctx.font = `${this._size}px sans-serif`;
-    ctx.fillText(this.emoji, this.x, this.y);
+  draw(context: CanvasRenderingContext2D): void {
+    context.font = `${this._size}px sans-serif`;
+    context.fillText(this.emoji, this.x, this.y);
   }
-  execute() {
-    this.draw(ctx!);
+  execute(context?: CanvasRenderingContext2D) {
+    context = context ?? ctx!;
+    this.draw(context);
   }
 }
 
@@ -200,66 +203,70 @@ class CursorCommand {
     this.x = x;
     this.y = y;
   }
-  execute() {
-    ctx!.font = `32px monospace`;
-    ctx!.fillText("*", this.x + this.offset.x, this.y + this.offset.y);
+  execute(context?: CanvasRenderingContext2D) {
+    context = context ?? ctx!;
+    context.font = `32px monospace`;
+    context.fillText("*", this.x + this.offset.x, this.y + this.offset.y);
   }
 }
 
 class Button {
   public name: string;
   public onClick?: () => void;
-  private button: HTMLButtonElement;
+  private _button: HTMLButtonElement;
 
-  constructor(name: string, onClick: () => void) {
+  constructor(name: string, onClick?: () => void) {
     this.name = name;
-    this.button = document.createElement("button");
+    this._button = document.createElement("button");
     this.onClick = onClick;
     this.setOnClickFunction();
   }
 
   private setOnClickFunction(): void {
-    this.button.innerHTML = this.name;
+    this._button.innerHTML = this.name;
 
     if (this.onClick) {
-      this.button.addEventListener("click", () => {
+      this._button.addEventListener("click", () => {
         this.onClick!();
       });
     } else {
-      this.button.addEventListener("click", () => {
-        console.log(`There's no onClick for ${this.button.innerHTML}`);
+      this._button.addEventListener("click", () => {
+        console.log(`There's no onClick for ${this._button.innerHTML}`);
       });
     }
-    app.append(this.button);
+    app.append(this._button);
   }
   remove(): void {
-    if (this.button) {
-      this.button.remove();
-      console.log(`${this.button.innerHTML} has been moved.`);
+    if (this._button) {
+      this._button.remove();
+      console.log(`${this._button.innerHTML} has been moved.`);
     }
   }
   setOnClick(onClick: () => void): void {
     this.onClick = onClick;
-    if (this.button) {
-      this.button.addEventListener("click", () => {
+    if (this._button) {
+      this._button.addEventListener("click", () => {
         this.onClick!();
       });
     }
   }
   setName(name: string): void {
     this.name = name;
-    if (this.button) {
-      this.button.innerHTML = name;
+    if (this._button) {
+      this._button.innerHTML = name;
     }
   }
   get innerHTML(): string {
-    return this.button.innerHTML;
+    return this._button.innerHTML;
   }
   set innerHTML(name: string) {
     this.name = name;
-    if (this.button) {
-      this.button.innerHTML = name;
+    if (this._button) {
+      this._button.innerHTML = name;
     }
+  }
+  get button(): HTMLButtonElement {
+    return this._button;
   }
 }
 
@@ -408,3 +415,21 @@ function updateCustomButton() {
   });
 }
 updateCustomButton();
+
+//step 10
+app.append(document.createElement("br"));
+const exportButton = new Button("exprot");
+exportButton.setOnClick(() => {
+  const tempCanvas = document.createElement("canvas");
+  tempCanvas.width = canvasScale * TEMP_CANVAS_SCALE_MULTIPLIER;
+  tempCanvas.height = canvasScale * TEMP_CANVAS_SCALE_MULTIPLIER;
+  const tempCtx = tempCanvas.getContext("2d");
+  tempCtx!.scale(TEMP_CANVAS_SCALE_MULTIPLIER, TEMP_CANVAS_SCALE_MULTIPLIER);
+  commands.forEach((cmd) => {
+    cmd.execute(tempCtx!);
+  });
+  const anchor = document.createElement("a");
+  anchor.href = tempCanvas.toDataURL("image/png");
+  anchor.download = "sketchpad.png";
+  anchor.click();
+});
